@@ -1,0 +1,553 @@
+I need you to design and implement an **MVP0 Telegram bot** using **Python + aiogram 3 + SQLite**.
+
+This is **not the full product**, but the **first working version** that will later be expanded.  
+Right now, implement only the **core of the “Now” mode** and the **event editor**.  
+The **“Long-term”** section should exist only as a placeholder for now.
+
+---
+
+## 1. What I want from you, step by step
+
+Please provide the result in this order:
+
+1. **Project structure plan**
+2. **List of files**
+3. **Code for each file**
+4. **Run/setup instructions**
+5. A short explanation of **how to extend this into Phase 2 later**
+
+Do not jump directly into one huge monolithic code dump.  
+First show the structure, then the files.
+
+---
+
+## 2. Stack and requirements
+
+Use:
+
+- **Python**
+- **aiogram 3**
+- **SQLite**
+- a clean **modular structure**
+- inline keyboard for the interface
+- FSM **only where step-by-step input is actually needed** (for example, creating/renaming objects)
+
+I want the project to be:
+
+- clear
+- extendable
+- not overengineered
+- ready for future expansion
+
+---
+
+## 3. General bot concept
+
+The bot has 2 conceptual modes:
+
+1. **Now** (`doing`)
+2. **Long-term** (`do`)
+
+### Important:
+In **MVP0**, only **“Now”** is implemented.
+
+The **“Long-term”** section must not be implemented yet; it should only show a placeholder:
+
+> The “Long-term” section will be implemented later.
+
+---
+
+## 4. Main menu
+
+The main menu should contain these buttons:
+
+- **⚡ Now**
+- **🌱 Long-term**
+- **📊 Today**
+- **✏️ Event Editor**
+- **⚙️ Settings**
+- **ℹ️ Help**
+
+---
+
+## 5. Behavior of the “Now” section
+
+The “Now” section should work like this:
+
+### If there is no active session
+Open the **event tree**.
+
+### If there is already an active session
+When the user enters “⚡ Now”, it should **immediately open the active session screen**.
+
+This is a fixed requirement.
+
+---
+
+## 6. Event model
+
+There is an event tree.
+
+It can contain:
+
+- **groups**
+- **subgroups**
+- **actions**
+
+### Rules:
+- a group can contain:
+  - subgroups
+  - actions
+- an action can exist:
+  - inside a group
+  - without a group, at the root level
+- only an **action** can be started
+- an action can have **many sessions**
+
+### Example:
+- Work
+  - Client A
+    - Backend
+    - Frontend
+  - Project B
+- Study
+  - Python
+  - SQL
+- Walking
+
+---
+
+## 7. Event tree — important UI implementation detail
+
+The event tree must be implemented as **inline navigation inside a single message**.
+
+That means:
+
+- the bot shows one message
+- this message contains the list of elements on the current level
+- when the user enters a group, the bot **edits this same message**
+- the content is replaced with the content of the selected group
+- when the user presses “Back”, the bot returns to the previous tree level
+- do not create a new message for every tree level
+
+### The tree screen must show:
+- current path
+- list of groups and actions
+- `🔙 Back` button (if not at root)
+- `🏠 Main menu` button
+
+### Element types:
+- `📁` — group
+- `▶️` — action
+
+### For groups, show:
+- the number of **direct child elements**
+  - subgroups
+  - actions
+
+### Actions without a group
+Show them directly at the current level next to groups, **without a separate virtual “Ungrouped” folder**.
+
+Example:
+- 📁 Work (3)
+- 📁 Study (2)
+- ▶️ Walking
+- ▶️ Reading
+
+---
+
+## 8. Interface states inside the “Now” section
+
+There are 3 interface states inside “Now”:
+
+### 1. Event tree navigation
+When there is no active session.
+
+### 2. Selected action
+When the user reaches a specific action.
+
+The selected action screen should show:
+- action name
+- path / parent
+- how much time was already spent on this action **today**
+
+Buttons:
+- `▶️ Start`
+- `🔙 Back`
+- `🏠 Main menu`
+
+### 3. Active session
+When the action has already been started and the timer is running.
+
+---
+
+## 9. Session start logic
+
+Only an **action** can be started.
+
+When the user presses `Start`:
+
+### If there is no active session
+Create a new session.
+
+### If there is already an active session
+Show this message:
+
+> You already have an active action  
+> State: Now
+
+And then redirect the user to the active session screen.
+
+---
+
+## 10. Session limit
+
+A user can have **only one active session at a time**.
+
+---
+
+## 11. Active session screen
+
+The active session screen should display:
+
+- action name
+- state: **Now**
+- status: running / paused
+- elapsed time
+- start time
+- how much time was already spent on this action today
+
+### When the session is running
+Buttons:
+- `⏸ Pause`
+- `✅ Finish`
+- `📊 Today`
+- `🏠 Main menu`
+
+### When the session is paused
+Buttons:
+- `▶️ Resume`
+- `✅ Finish`
+- `🏠 Main menu`
+
+---
+
+## 12. Live timer
+
+The active session message should update **every 5 seconds**.
+
+### Important:
+- the final duration shown when finishing the session must be **precise**
+- do not round the final result to 5-second steps
+
+---
+
+## 13. Very important rule
+
+**Message update failure ≠ session loss**
+
+If Telegram does not allow updating the message:
+
+- the session must not be lost
+- the timer must not be reset
+- the database must remain the source of truth
+- the live message can be recreated later if needed
+
+---
+
+## 14. Time storage
+
+Do not update the database every 5 seconds.
+
+The database should store:
+- `started_at`
+- session status
+- pauses
+- `ended_at`
+- final duration after finishing (optional if you want to store it explicitly)
+
+The current elapsed time should be calculated **on the fly**.
+
+---
+
+## 15. Pauses
+
+Store pauses in a **separate table**.
+
+One session can have multiple pauses.
+
+---
+
+## 16. Behavior after bot restart
+
+If the bot is restarted:
+
+- the active session must remain in the database
+- it must not be lost
+- the live message can be reopened / recreated later if necessary
+
+---
+
+## 17. “Today” section
+
+The “Today” section should show:
+
+- list of actions that had sessions today
+- total time per action
+- number of sessions per action
+- total time for the day
+
+Example:
+- Backend API — 01:10:00 (3 sessions)
+- SQL — 00:40:00 (1 session)
+- Walking — 00:25:00 (2 sessions)
+- Total for today: 02:15:00
+
+---
+
+## 18. Settings
+
+In MVP0, Settings should include only 2 options:
+
+1. **Confirm session finish**
+2. **Confirm deletion**
+
+### Default values:
+- confirm session finish — **off**
+- confirm deletion — **on**
+
+---
+
+## 19. Confirm finish behavior
+
+If the setting is enabled, ask for confirmation before finishing a session.
+
+If disabled, finish immediately.
+
+---
+
+## 20. Event editor
+
+Editing the event tree must be placed in a separate section:
+
+**✏️ Event Editor**
+
+Only there the user can:
+
+- create groups
+- create actions
+- rename groups
+- rename actions
+- delete groups
+- delete actions
+
+---
+
+## 21. Object creation
+
+### Creating an action
+First the user chooses:
+- where to create the action
+  - root
+  - group
+  - subgroup
+
+Then enters the name.
+
+### Creating a group
+First the user chooses:
+- where to create the group
+  - root
+  - group
+
+Then enters the name.
+
+---
+
+## 22. Name uniqueness
+
+### For actions
+The name must be unique **within the same parent/container**.
+
+### For groups
+Same rule — unique within the same parent.
+
+---
+
+## 23. Empty group
+
+If the user opens a group and it has no elements inside, show:
+
+- a message that the group is empty
+- `🔙 Back`
+- `✏️ Open Event Editor`
+
+---
+
+## 24. Event editor limitations in MVP0
+
+### Not allowed:
+- moving elements between groups
+- deleting an action if it currently has an active session
+- renaming an action if it currently has an active session
+
+---
+
+## 25. Deletion in MVP0 — simplified
+
+In **MVP0**, do not implement the more complex historical logic for deleted actions.
+
+That means:
+- **do not implement restoration of deleted action history yet**
+- **do not implement container-based historical logic yet**
+- **do not implement reconnecting by name yet**
+
+This will be implemented in the **next phase**.
+
+### In MVP0, deletion should be simpler:
+- delete action
+- delete group
+- confirmation based on settings
+
+### For groups:
+- allow deletion only if the group is empty
+
+---
+
+## 26. Long-term in MVP0
+
+The button and section exist, but do not work yet.
+
+When the user enters “🌱 Long-term”, show only:
+
+> The “Long-term” section will be implemented later.
+
+---
+
+## 27. FSM
+
+Use FSM **only for step-by-step input scenarios**:
+
+- creating a group
+- creating an action
+- renaming a group
+- renaming an action
+
+All other navigation should be done with inline buttons and callback handlers.
+
+---
+
+## 28. What is included in MVP0
+
+Included:
+
+- main menu
+- “Now” section
+- event tree
+- groups / subgroups / actions
+- ungrouped actions
+- selected action screen
+- session start
+- one active session
+- live timer
+- pause
+- resume
+- finish
+- “Today”
+- settings
+- help
+- event editor
+- create / rename / delete groups
+- create / rename / delete actions
+- placeholder for Long-term
+
+---
+
+## 29. What is NOT included in MVP0
+
+Not included:
+
+- full Long-term mode
+- moving into Long-term
+- habits
+- streaks
+- motivational messages
+- reminders
+- advanced statistics
+- weekly statistics
+- charts
+- moving elements between groups
+- complex deleted-action history logic
+- restoring deleted actions by name
+- advanced settings
+- AI features
+- physical buttons
+
+---
+
+## 30. Architecture expectations
+
+I want a clean modular structure, something close to this (you may improve it if needed):
+
+- `bot.py`
+- `config.py`
+- `handlers/`
+- `services/`
+- `db/`
+- `keyboards/`
+- `states/`
+- `utils/`
+
+If you think the structure should differ, propose your own, but avoid overengineering.
+
+---
+
+## 31. Additional code expectations
+
+I want the code to be:
+
+- readable
+- properly separated by responsibility
+- using good function names
+- without unnecessary magic
+- with comments only where actually useful
+- suitable for future extension into the next phase
+
+---
+
+## 32. What should be future-proofed
+
+Even though we are implementing only MVP0, the architecture should not block future addition of:
+
+- Long-term mode
+- moving an action into Long-term
+- more complex history logic
+- expanded settings
+
+But **do not implement these now** — just do not make the architecture hostile to them.
+
+---
+
+## 33. After the code
+
+After you provide the code:
+- explain how to run the project
+- list dependencies
+- explain how to configure the bot token
+- explain how to initialize the database
+- explain how to manually test the main scenarios
+
+---
+
+## 34. Response format
+
+Very important:
+1. first give the **project structure**
+2. then the **list of files**
+3. then the **code file by file**
+4. then the **run instructions**
+5. then a short note about **what to do in Phase 2**
+
+Do not give only general advice — I need a real project skeleton that can be run and extended.
+
+Also, do not simplify this into pseudocode. I need a real working project foundation that can be launched and then extended.
