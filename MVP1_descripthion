@@ -1,0 +1,113 @@
+Database structure for MVP1
+
+For MVP1, the database is designed with future product growth, data normalization, and scalable business logic in mind. The hierarchy is stored using the adjacency list model: each tree element keeps a reference to its parent via parent_id.
+
+Main database tables:
+
+1. users
+The users table stores the main Telegram user information:
+- internal record id;
+- telegram_user_id;
+- chat_id;
+- display_name;
+- timezone;
+- created_at;
+- updated_at.
+
+The purpose of this table is to store the user as a core system entity. User settings are not mixed with the identity data and are moved into a separate table.
+
+2. user_settings
+The user_settings table stores user-specific configuration:
+- id;
+- user_id;
+- confirm_finish;
+- confirm_delete;
+- created_at;
+- updated_at.
+
+One user corresponds to one settings row. This separation keeps user identity data independent from bot behavior configuration.
+
+3. nodes
+The nodes table is the central structural table. It stores all tree nodes:
+- groups;
+- subgroups;
+- actions.
+
+Table fields:
+- id;
+- user_id;
+- parent_id;
+- node_type;
+- name;
+- depth;
+- is_active;
+- created_at;
+- updated_at.
+
+In the nodes table:
+- node_type defines the node kind: group or action;
+- parent_id points to the parent node;
+- parent_id = 0 means root level;
+- depth stores the depth of the node in the tree;
+- is_active is included as a future-ready field for soft deletion, archiving, or hiding elements.
+
+For MVP1, the maximum tree depth is fixed at 5 nesting levels.
+
+A uniqueness rule must also be enforced inside one parent:
+- UNIQUE(user_id, parent_id, name)
+
+This means two elements with the same name cannot exist in the same container, but identical names are allowed in different branches of the tree.
+
+4. sessions
+The sessions table stores action execution facts.
+
+Table fields:
+- id;
+- user_id;
+- node_id;
+- status;
+- started_at;
+- ended_at;
+- duration_seconds;
+- timer_chat_id;
+- timer_message_id;
+- created_at;
+- updated_at.
+
+The sessions table stores only action sessions. The node_id field must reference only nodes of type action.
+
+The status field can have the following values:
+- running;
+- paused;
+- finished.
+
+The duration_seconds field stores the final duration of a finished session in seconds. It is a useful controlled denormalization that speeds up statistics and reporting.
+
+5. session_pauses
+The session_pauses table stores pause intervals inside sessions.
+
+Table fields:
+- id;
+- session_id;
+- started_at;
+- ended_at;
+- created_at.
+
+One session may contain multiple pauses. This allows the system to calculate net working time correctly, excluding pauses from the total duration.
+
+Relationships between tables:
+- user_settings.user_id -> users.id
+- nodes.user_id -> users.id
+- nodes.parent_id -> nodes.id (or 0 for root)
+- sessions.user_id -> users.id
+- sessions.node_id -> nodes.id
+- session_pauses.session_id -> sessions.id
+
+Core structural logic:
+- users — who uses the system;
+- user_settings — how the bot behaves for a specific user;
+- nodes — the tree of groups, subgroups, and actions;
+- sessions — facts of action execution;
+- session_pauses — pauses inside sessions.
+
+This database structure is suitable for MVP1, remains reasonably clean from a normalization perspective, and still allows future extensions such as long-term entities, links between modes, deletion history, and expanded settings.
