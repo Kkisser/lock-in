@@ -6,7 +6,7 @@ from services.session_service import (
     pause_session, resume_session, finish_session,
     calc_elapsed, get_session,
 )
-from services.event_service import get_path_string
+from services.event_service import get_path_string_for_action
 from services.user_service import get_user
 from utils.time_utils import format_duration
 from utils.timer import TimerManager
@@ -26,7 +26,7 @@ async def session_control(callback: CallbackQuery, callback_data: SesCB,
         await callback.answer("Session not found.", show_alert=True)
         return
 
-    path_str = await get_path_string(session["node_id"])
+    path_str = await get_path_string_for_action(session["user_id"], session["action_id"])
 
     if action == "pause":
         await pause_session(session_id)

@@ -1,6 +1,6 @@
 from db import queries
 
-MAX_DEPTH = 4  # actions can be at depth 0..4 (5 levels total)
+MAX_DEPTH = 4  # action_refs can be at depth 0..4 (5 levels total)
 
 
 class NestingError(Exception):
@@ -28,6 +28,15 @@ async def get_path_string(node_id: int) -> str:
     return " → ".join(n["name"] for n in path)
 
 
+async def get_path_string_for_action(user_id: int, action_id: int) -> str:
+    """Build path string by finding the action_ref node for this action."""
+    node = await queries.get_action_ref_node(user_id, action_id)
+    if node:
+        return await get_path_string(node["id"])
+    action = await queries.get_action(action_id)
+    return action["name"] if action else "Unknown"
+
+
 async def create_node(user_id: int, parent_id: int, name: str,
                       node_type: str) -> int:
     if parent_id == 0:
@@ -41,14 +50,22 @@ async def create_node(user_id: int, parent_id: int, name: str,
         child_depth = parent["depth"] + 1
         if node_type == "group" and child_depth > MAX_DEPTH - 1:
             raise NestingError("Maximum group nesting depth reached.")
-        if node_type == "action" and child_depth > MAX_DEPTH:
+        if node_type == "action_ref" and child_depth > MAX_DEPTH:
             raise NestingError("Maximum nesting depth reached.")
         depth = child_depth
 
+    action_id = None
+    if node_type == "action_ref":
+        action_id = await queries.create_action(user_id, name)
+
     try:
-        return await queries.create_node(user_id, parent_id, name, node_type, depth)
+        return await queries.create_node(
+            user_id, parent_id, name, node_type, depth, action_id
+        )
     except Exception as e:
         if "UNIQUE constraint" in str(e):
+            if action_id:
+                await queries.delete_action(action_id)
             raise DuplicateNameError(
                 f"A node named '{name}' already exists in this location."
             )
@@ -56,8 +73,11 @@ async def create_node(user_id: int, parent_id: int, name: str,
 
 
 async def rename_node(node_id: int, new_name: str):
+    node = await queries.get_node(node_id)
     try:
         await queries.rename_node(node_id, new_name)
+        if node and node["node_type"] == "action_ref" and node["action_id"]:
+            await queries.rename_action(node["action_id"], new_name)
     except Exception as e:
         if "UNIQUE constraint" in str(e):
             raise DuplicateNameError(
@@ -69,13 +89,18 @@ async def rename_node(node_id: int, new_name: str):
 async def can_delete(node_id: int) -> tuple[bool, str]:
     if await queries.has_children(node_id):
         return False, "Cannot delete: group is not empty. Delete children first."
-    if await queries.has_active_session_for_node(node_id):
-        return False, "Cannot delete: action has an active session. Finish it first."
+    node = await queries.get_node(node_id)
+    if node and node["node_type"] == "action_ref" and node["action_id"]:
+        if await queries.has_active_session_for_action(node["action_id"]):
+            return False, "Cannot delete: action has an active session. Finish it first."
     return True, ""
 
 
 async def delete_node(node_id: int):
+    node = await queries.get_node(node_id)
     await queries.delete_node(node_id)
+    if node and node["node_type"] == "action_ref" and node["action_id"]:
+        await queries.delete_action(node["action_id"])
 
 
 async def move_node(node_id: int, target_parent_id: int):
@@ -83,11 +108,9 @@ async def move_node(node_id: int, target_parent_id: int):
     if node is None:
         raise NestingError("Node not found.")
 
-    # Cannot move into itself
     if target_parent_id == node_id:
         raise NestingError("Cannot move a node into itself.")
 
-    # Calculate new depth
     if target_parent_id == 0:
         new_depth = 0
     else:
@@ -101,15 +124,12 @@ async def move_node(node_id: int, target_parent_id: int):
     old_depth = node["depth"]
     depth_diff = new_depth - old_depth
 
-    # Get all descendants
     descendants = await queries.get_descendants(node_id)
     descendant_ids = {d["id"] for d in descendants}
 
-    # Cannot move into own descendant
     if target_parent_id in descendant_ids:
         raise NestingError("Cannot move a node into one of its descendants.")
 
-    # Validate resulting depth
     if descendants:
         max_relative_depth = max(d["depth"] - old_depth for d in descendants)
         if new_depth + max_relative_depth > MAX_DEPTH:
@@ -118,9 +138,6 @@ async def move_node(node_id: int, target_parent_id: int):
                 "Move subtree to a shallower location."
             )
 
-    # Execute move
     await queries.move_node(node_id, target_parent_id, new_depth)
-
-    # Update depths of all descendants
     for d in descendants:
         await queries.update_node_depth(d["id"], d["depth"] + depth_diff)

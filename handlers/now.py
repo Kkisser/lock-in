@@ -2,11 +2,13 @@ from aiogram import Router, F
 from aiogram.types import Message, CallbackQuery
 
 from callbacks.factory import NavCB, SelCB, StartCB
-from services.event_service import get_children, get_node, get_path_string
+from services.event_service import (
+    get_children, get_node, get_path_string, get_path_string_for_action,
+)
 from services.session_service import (
     get_active_session, start_session, calc_elapsed, update_session_message,
 )
-from services.today_service import get_today_time_for_node
+from services.today_service import get_today_time_for_action
 from services.user_service import get_user
 from utils.time_utils import format_duration
 from utils.timer import TimerManager
@@ -30,12 +32,12 @@ async def btn_now(message: Message, user_id: int, timer_manager: TimerManager):
     active = await get_active_session(user_id)
     if active:
         elapsed = await calc_elapsed(active["id"])
-        path_str = await get_path_string(active["node_id"])
+        path_str = await get_path_string_for_action(user_id, active["action_id"])
         status_icon = "▶️" if active["status"] == "running" else "⏸"
 
         user = await get_user(user_id)
         user_tz = user["timezone"] if user else "UTC"
-        today_finished = await get_today_time_for_node(user_id, active["node_id"], user_tz)
+        today_finished = await get_today_time_for_action(user_id, active["action_id"], user_tz)
         total_today = today_finished + elapsed
 
         text = (f"{status_icon} {path_str}\n"
@@ -108,7 +110,7 @@ async def select_action(callback: CallbackQuery, callback_data: SelCB, user_id: 
 
     user = await get_user(user_id)
     user_tz = user["timezone"] if user else "UTC"
-    today_time = await get_today_time_for_node(user_id, node["id"], user_tz)
+    today_time = await get_today_time_for_action(user_id, node["action_id"], user_tz)
 
     await callback.message.edit_text(
         f"🎯 {path_str}{_today_line(today_time)}\n\nStart tracking?",
@@ -127,23 +129,24 @@ async def start_action(callback: CallbackQuery, callback_data: StartCB,
         await callback.answer("Event not found.", show_alert=True)
         return
 
+    action_id = node["action_id"]
     path_str = await get_path_string(node_id)
 
     user = await get_user(user_id)
     user_tz = user["timezone"] if user else "UTC"
-    today_finished = await get_today_time_for_node(user_id, node_id, user_tz)
+    today_finished = await get_today_time_for_action(user_id, action_id, user_tz)
 
     text = f"▶️ {path_str}\n⏱ {format_duration(0)}{_today_line(today_finished)}"
     await callback.message.edit_text(text)
 
     session_id = await start_session(
-        user_id, node_id, callback.message.message_id, callback.message.chat.id
+        user_id, action_id, callback.message.message_id, callback.message.chat.id
     )
 
     if session_id is None:
         active = await get_active_session(user_id)
         if active:
-            active_path = await get_path_string(active["node_id"])
+            active_path = await get_path_string_for_action(user_id, active["action_id"])
             await callback.message.edit_text(
                 f"You already have an active session:\n▶️ {active_path}\n\n"
                 "Finish it first before starting a new one.",
@@ -152,6 +155,5 @@ async def start_action(callback: CallbackQuery, callback_data: StartCB,
         return
 
     await callback.message.edit_reply_markup(reply_markup=running_kb(session_id))
-
     timer_manager.start_timer(user_id, session_id)
     await callback.answer("Session started!")

@@ -5,8 +5,8 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 
 from services.session_service import calc_elapsed, get_session
-from services.event_service import get_path_string
-from services.today_service import get_today_time_for_node
+from services.event_service import get_path_string_for_action
+from services.today_service import get_today_time_for_action
 from services.user_service import get_user
 from utils.time_utils import format_duration
 from keyboards.session_kb import running_kb, paused_kb
@@ -38,13 +38,15 @@ class TimerManager:
                     break
 
                 elapsed = await calc_elapsed(session_id)
-                path_str = await get_path_string(session["node_id"])
+                path_str = await get_path_string_for_action(
+                    session["user_id"], session["action_id"]
+                )
                 status_icon = "▶️" if session["status"] == "running" else "⏸"
 
                 user = await get_user(session["user_id"])
                 user_tz = user["timezone"] if user else "UTC"
-                today_finished = await get_today_time_for_node(
-                    session["user_id"], session["node_id"], user_tz
+                today_finished = await get_today_time_for_action(
+                    session["user_id"], session["action_id"], user_tz
                 )
                 total_today = today_finished + elapsed
                 today_line = f"\n📊 Today: {format_duration(total_today)}"

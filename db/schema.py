@@ -20,12 +20,23 @@ CREATE TABLE IF NOT EXISTS user_settings (
     updated_at     TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS actions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    name        TEXT NOT NULL,
+    description TEXT,
+    is_active   INTEGER NOT NULL DEFAULT 1,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS nodes (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER NOT NULL REFERENCES users(id),
     parent_id  INTEGER NOT NULL DEFAULT 0,
-    node_type  TEXT NOT NULL CHECK(node_type IN ('group', 'action')),
+    node_type  TEXT NOT NULL CHECK(node_type IN ('group', 'action_ref')),
     name       TEXT NOT NULL,
+    action_id  INTEGER REFERENCES actions(id),
     depth      INTEGER NOT NULL DEFAULT 0,
     is_active  INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
@@ -33,10 +44,10 @@ CREATE TABLE IF NOT EXISTS nodes (
     UNIQUE(user_id, parent_id, name)
 );
 
-CREATE TABLE IF NOT EXISTS sessions (
+CREATE TABLE IF NOT EXISTS action_sessions (
     id               INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id          INTEGER NOT NULL REFERENCES users(id),
-    node_id          INTEGER NOT NULL REFERENCES nodes(id),
+    action_id        INTEGER NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
     status           TEXT NOT NULL CHECK(status IN ('running','paused','finished')),
     started_at       TEXT NOT NULL,
     ended_at         TEXT,
@@ -47,9 +58,9 @@ CREATE TABLE IF NOT EXISTS sessions (
     updated_at       TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS session_pauses (
+CREATE TABLE IF NOT EXISTS action_session_pauses (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id INTEGER NOT NULL REFERENCES sessions(id),
+    session_id INTEGER NOT NULL REFERENCES action_sessions(id) ON DELETE CASCADE,
     started_at TEXT NOT NULL,
     ended_at   TEXT,
     created_at TEXT NOT NULL

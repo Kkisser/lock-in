@@ -22,7 +22,7 @@ def editor_tree_kb(children: list[dict], parent_id: int,
     if can_create_action:
         create_row.append(InlineKeyboardButton(
             text="🎯+ Action",
-            callback_data=ELocCB(parent_id=parent_id, event_type="action").pack(),
+            callback_data=ELocCB(parent_id=parent_id, event_type="action_ref").pack(),
         ))
     if create_row:
         buttons.append(create_row)

@@ -6,12 +6,12 @@ async def get_active_session(user_id: int) -> dict | None:
     return await queries.get_active_session(user_id)
 
 
-async def start_session(user_id: int, node_id: int,
+async def start_session(user_id: int, action_id: int,
                         timer_message_id: int, timer_chat_id: int) -> int | None:
     active = await queries.get_active_session(user_id)
     if active:
         return None
-    return await queries.create_session(user_id, node_id, timer_message_id, timer_chat_id)
+    return await queries.create_session(user_id, action_id, timer_message_id, timer_chat_id)
 
 
 async def pause_session(session_id: int):

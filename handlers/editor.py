@@ -22,7 +22,7 @@ def _can_create(parent_id: int, parent_depth: int | None,
     """Return (can_create_group, can_create_action) based on depth."""
     if parent_id == 0:
         return True, True
-    if parent_depth is None or parent_type == "action":
+    if parent_depth is None or parent_type == "action_ref":
         return False, False
     # groups allowed so children will be at depth ≤ MAX_DEPTH-1
     can_group = parent_depth < MAX_DEPTH - 1
@@ -72,7 +72,7 @@ async def editor_select(callback: CallbackQuery, callback_data: ESelCB):
         return
 
     path_str = await get_path_string(node["id"])
-    icon = "📁" if node["node_type"] == "group" else "🎯"
+    icon = "📁" if node["node_type"] == "group" else "🎯"  # action_ref
     await callback.message.edit_text(
         f"{icon} {path_str}",
         reply_markup=event_manage_kb(node),
@@ -85,7 +85,7 @@ async def editor_create_prompt(callback: CallbackQuery, callback_data: ELocCB,
                                state: FSMContext):
     parent_id = callback_data.parent_id
     event_type = callback_data.event_type
-    type_label = "group" if event_type == "group" else "action"
+    type_label = "group" if event_type == "group" else "action"  # action_ref → "action" label
 
     location = "root level" if parent_id == 0 else await get_path_string(parent_id)
 
@@ -195,7 +195,7 @@ async def editor_receive_rename(message: Message, state: FSMContext):
 
     node = await get_node(node_id)
     path_str = await get_path_string(node_id)
-    icon = "📁" if node["node_type"] == "group" else "🎯"
+    icon = "📁" if node["node_type"] == "group" else "🎯"  # action_ref
     await message.answer(
         f"✅ Renamed to '{new_name}'!\n\n{icon} {path_str}",
         reply_markup=event_manage_kb(node),
@@ -209,7 +209,7 @@ async def confirm_delete(callback: CallbackQuery, callback_data: CDelCB,
         node = await get_node(callback_data.node_id)
         if node:
             path_str = await get_path_string(node["id"])
-            icon = "📁" if node["node_type"] == "group" else "🎯"
+            icon = "📁" if node["node_type"] == "group" else "🎯"  # action_ref
             await callback.message.edit_text(
                 f"{icon} {path_str}",
                 reply_markup=event_manage_kb(node),
