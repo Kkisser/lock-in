@@ -4,7 +4,7 @@ import logging
 from typing import Any, Callable, Awaitable
 
 from aiogram import Bot, Dispatcher, BaseMiddleware
-from aiogram.types import TelegramObject
+from aiogram.types import TelegramObject, Message, CallbackQuery
 from aiogram.fsm.storage.memory import MemoryStorage
 
 from config import BOT_TOKEN
@@ -27,7 +27,15 @@ class EnsureUserMiddleware(BaseMiddleware):
     ) -> Any:
         user = data.get("event_from_user")
         if user:
-            await ensure_user(user.id)
+            if isinstance(event, Message):
+                chat_id = event.chat.id
+            elif isinstance(event, CallbackQuery) and event.message:
+                chat_id = event.message.chat.id
+            else:
+                chat_id = user.id
+            display_name = user.full_name or user.username or str(user.id)
+            internal_id = await ensure_user(user.id, chat_id, display_name)
+            data["user_id"] = internal_id
         return await handler(event, data)
 
 

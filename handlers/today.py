@@ -8,8 +8,7 @@ router = Router()
 
 
 @router.message(F.text == "📊 Today")
-async def btn_today(message: Message):
-    user_id = message.from_user.id
+async def btn_today(message: Message, user_id: int):
     user = await get_user(user_id)
     tz = user["timezone"] if user else "UTC"
     summary = await get_today_summary(user_id, tz)

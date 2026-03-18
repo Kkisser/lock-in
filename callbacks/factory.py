@@ -8,12 +8,12 @@ class NavCB(CallbackData, prefix="nav"):
 
 class SelCB(CallbackData, prefix="sel"):
     """Select an action to start in 'Now' mode."""
-    event_id: int
+    node_id: int
 
 
 class StartCB(CallbackData, prefix="start"):
     """Confirm starting a session."""
-    event_id: int
+    node_id: int
 
 
 class SesCB(CallbackData, prefix="ses"):
@@ -28,18 +28,18 @@ class ENavCB(CallbackData, prefix="enav"):
 
 
 class ESelCB(CallbackData, prefix="esel"):
-    """Editor: select an event to manage."""
-    event_id: int
+    """Editor: select a node to manage."""
+    node_id: int
 
 
 class EActCB(CallbackData, prefix="eact"):
-    """Editor action: create_group / create_action / rename / delete / confirm_delete / cancel_delete."""
+    """Editor action: create_group / create_action / rename / delete / move."""
     action: str
-    event_id: int
+    node_id: int
 
 
 class ELocCB(CallbackData, prefix="eloc"):
-    """Editor: choose location (parent) for new event creation."""
+    """Editor: choose location (parent) for new node creation."""
     parent_id: int
     event_type: str
 
@@ -47,9 +47,26 @@ class ELocCB(CallbackData, prefix="eloc"):
 class CDelCB(CallbackData, prefix="cdel"):
     """Confirm or cancel deletion."""
     action: str  # "yes" or "no"
-    event_id: int
+    node_id: int
 
 
 class SetCB(CallbackData, prefix="set"):
-    """Settings toggle."""
-    key: str  # "confirm_finish" or "confirm_delete"
+    """Settings toggle / action."""
+    key: str  # "confirm_finish", "confirm_delete", "timezone"
+
+
+class TzCB(CallbackData, prefix="tz"):
+    """Select timezone."""
+    tz: str
+
+
+class EMvNavCB(CallbackData, prefix="emvnav"):
+    """Editor move: navigate tree while selecting move destination."""
+    parent_id: int
+    node_id: int
+
+
+class EMvSelCB(CallbackData, prefix="emvsel"):
+    """Editor move: confirm move to selected parent."""
+    target_parent_id: int
+    node_id: int

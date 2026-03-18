@@ -17,17 +17,16 @@ router = Router()
 
 @router.callback_query(SesCB.filter())
 async def session_control(callback: CallbackQuery, callback_data: SesCB,
-                          timer_manager: TimerManager):
+                          user_id: int, timer_manager: TimerManager):
     action = callback_data.action
     session_id = callback_data.session_id
-    user_id = callback.from_user.id
 
     session = await get_session(session_id)
     if session is None:
         await callback.answer("Session not found.", show_alert=True)
         return
 
-    path_str = await get_path_string(session["event_id"])
+    path_str = await get_path_string(session["node_id"])
 
     if action == "pause":
         await pause_session(session_id)

@@ -6,7 +6,7 @@ from keyboards.common import back_button
 def build_tree_kb(children: list[dict], parent_id: int) -> InlineKeyboardMarkup:
     buttons = []
     for child in children:
-        if child["type"] == "group":
+        if child["node_type"] == "group":
             buttons.append([InlineKeyboardButton(
                 text=f"📁 {child['name']}",
                 callback_data=NavCB(parent_id=child["id"]).pack(),
@@ -14,7 +14,7 @@ def build_tree_kb(children: list[dict], parent_id: int) -> InlineKeyboardMarkup:
         else:
             buttons.append([InlineKeyboardButton(
                 text=f"🎯 {child['name']}",
-                callback_data=SelCB(event_id=child["id"]).pack(),
+                callback_data=SelCB(node_id=child["id"]).pack(),
             )])
 
     if parent_id != 0:
@@ -26,7 +26,7 @@ def build_tree_kb(children: list[dict], parent_id: int) -> InlineKeyboardMarkup:
 def build_tree_kb_with_back(children: list[dict], current_event_parent_id: int) -> InlineKeyboardMarkup:
     buttons = []
     for child in children:
-        if child["type"] == "group":
+        if child["node_type"] == "group":
             buttons.append([InlineKeyboardButton(
                 text=f"📁 {child['name']}",
                 callback_data=NavCB(parent_id=child["id"]).pack(),
@@ -34,7 +34,7 @@ def build_tree_kb_with_back(children: list[dict], current_event_parent_id: int) 
         else:
             buttons.append([InlineKeyboardButton(
                 text=f"🎯 {child['name']}",
-                callback_data=SelCB(event_id=child["id"]).pack(),
+                callback_data=SelCB(node_id=child["id"]).pack(),
             )])
 
     buttons.append([back_button(current_event_parent_id, editor=False)])
@@ -45,7 +45,7 @@ def action_confirm_kb(event_id: int, parent_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
             text="▶️ Start",
-            callback_data=StartCB(event_id=event_id).pack(),
+            callback_data=StartCB(node_id=event_id).pack(),
         )],
         [back_button(parent_id, editor=False)],
     ])

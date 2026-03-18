@@ -6,29 +6,30 @@ async def get_active_session(user_id: int) -> dict | None:
     return await queries.get_active_session(user_id)
 
 
-async def start_session(user_id: int, event_id: int,
-                        message_id: int, chat_id: int) -> int | None:
+async def start_session(user_id: int, node_id: int,
+                        timer_message_id: int, timer_chat_id: int) -> int | None:
     active = await queries.get_active_session(user_id)
     if active:
         return None
-    return await queries.create_session(user_id, event_id, message_id, chat_id)
+    return await queries.create_session(user_id, node_id, timer_message_id, timer_chat_id)
 
 
 async def pause_session(session_id: int):
     await queries.update_session_status(session_id, "paused")
-    await queries.create_pause(session_id)
+    await queries.create_session_pause(session_id)
 
 
 async def resume_session(session_id: int):
-    await queries.end_pause(session_id)
+    await queries.end_session_pause(session_id)
     await queries.update_session_status(session_id, "running")
 
 
 async def finish_session(session_id: int):
     session = await queries.get_session(session_id)
     if session and session["status"] == "paused":
-        await queries.end_pause(session_id)
-    await queries.update_session_status(session_id, "finished")
+        await queries.end_session_pause(session_id)
+    elapsed = await calc_elapsed(session_id)
+    await queries.finish_session(session_id, elapsed)
 
 
 async def calc_elapsed(session_id: int) -> int:
@@ -40,7 +41,7 @@ async def calc_elapsed(session_id: int) -> int:
     end = parse_iso(session["ended_at"]) if session["ended_at"] else now_utc()
     total_seconds = int((end - start).total_seconds())
 
-    pauses = await queries.get_pauses(session_id)
+    pauses = await queries.get_session_pauses(session_id)
     pause_seconds = 0
     for p in pauses:
         p_start = parse_iso(p["started_at"])
@@ -54,5 +55,6 @@ async def get_session(session_id: int) -> dict | None:
     return await queries.get_session(session_id)
 
 
-async def update_session_message(session_id: int, message_id: int, chat_id: int):
-    await queries.update_session_message(session_id, message_id, chat_id)
+async def update_session_message(session_id: int,
+                                  timer_message_id: int, timer_chat_id: int):
+    await queries.update_session_timer_message(session_id, timer_message_id, timer_chat_id)

@@ -15,7 +15,7 @@ async def get_today_summary(user_id: int, user_tz: str = "UTC") -> str:
     for s in sessions:
         elapsed = await calc_elapsed(s["id"])
         total += elapsed
-        lines.append(f"  • {s['event_name']}: {format_duration(elapsed)}")
+        lines.append(f"  • {s['node_name']}: {format_duration(elapsed)}")
 
     header = f"📊 Today — {format_duration(total)} total\n"
     return header + "\n".join(lines)
