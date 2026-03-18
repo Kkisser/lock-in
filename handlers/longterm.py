@@ -180,7 +180,7 @@ async def lt_counter_target(message: Message, state: FSMContext):
     )
 
 
-@router.callback_query(LtSkipCB.filter())
+@router.callback_query(LtSkipCB.filter(), LongtermFSM.waiting_counter_unit)
 async def lt_skip(callback: CallbackQuery, user_id: int, state: FSMContext):
     await state.update_data(lt_counter_unit="times")
     data = await state.get_data()
@@ -219,6 +219,10 @@ async def lt_timer_target(message: Message, user_id: int, state: FSMContext):
 async def _finish_setup(msg, state: FSMContext, user_id: int):
     data = await state.get_data()
     await state.clear()
+
+    if "lt_node_id" not in data:
+        await msg.answer("Setup expired. Please start over.")
+        return
 
     node = await get_node(data["lt_node_id"])
     if node is None:
