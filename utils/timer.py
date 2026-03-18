@@ -36,7 +36,7 @@ class TimerManager:
                     break
 
                 elapsed = await calc_elapsed(session_id)
-                path_str = await get_path_string(session["event_id"])
+                path_str = await get_path_string(session["node_id"])
                 status_icon = "▶️" if session["status"] == "running" else "⏸"
                 text = f"{status_icon} {path_str}\n⏱ {format_duration(elapsed)}"
 
@@ -44,8 +44,8 @@ class TimerManager:
 
                 try:
                     await self.bot.edit_message_text(
-                        chat_id=session["chat_id"],
-                        message_id=session["message_id"],
+                        chat_id=session["timer_chat_id"],
+                        message_id=session["timer_message_id"],
                         text=text,
                         reply_markup=kb,
                     )
