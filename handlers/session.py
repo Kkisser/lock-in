@@ -8,6 +8,8 @@ from services.session_service import (
 )
 from services.event_service import get_path_string_for_action
 from services.user_service import get_user
+from services import longterm_service
+from db import queries
 from utils.time_utils import format_duration, format_local_time
 from utils.timer import TimerManager
 from keyboards.session_kb import running_kb, paused_kb, confirm_finish_kb
@@ -86,9 +88,21 @@ async def session_control(callback: CallbackQuery, callback_data: SesCB,
 async def _do_finish(callback: CallbackQuery, session_id: int,
                      path_str: str, timer_manager: TimerManager, user_id: int):
     timer_manager.stop_timer(user_id)
+    session = await get_session(session_id)
     await finish_session(session_id)
     elapsed = await calc_elapsed(session_id)
+
+    # Auto-increment Long-term counter if action has counter tracking
+    counter_note = ""
+    if session:
+        user = await get_user(user_id)
+        user_tz = user["timezone"] if user else "UTC"
+        lt = await queries.get_longterm_by_action(user_id, session["action_id"])
+        if lt and lt["tracking_type"] in ("counter", "both"):
+            await longterm_service.add_counter(lt["id"], user_id, 1, user_tz)
+            counter_note = "\n🔢 +1 counted (Long-term)"
+
     await callback.message.edit_text(
-        f"✅ Finished!\n\n🎯 {path_str}\n⏱ {format_duration(elapsed)}",
+        f"✅ Finished!\n\n🎯 {path_str}\n⏱ {format_duration(elapsed)}{counter_note}",
     )
     await callback.answer("Session finished!")
