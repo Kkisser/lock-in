@@ -6,6 +6,8 @@ from services.event_service import get_children, get_node, get_path_string
 from services.session_service import (
     get_active_session, start_session, calc_elapsed, update_session_message,
 )
+from services.today_service import get_today_time_for_node
+from services.user_service import get_user
 from utils.time_utils import format_duration
 from utils.timer import TimerManager
 from keyboards.navigation import (
@@ -17,6 +19,12 @@ from keyboards.session_kb import running_kb, paused_kb
 router = Router()
 
 
+def _today_line(today_seconds: int) -> str:
+    if today_seconds <= 0:
+        return ""
+    return f"\n📊 Today: {format_duration(today_seconds)}"
+
+
 @router.message(F.text == "▶️ Now")
 async def btn_now(message: Message, user_id: int, timer_manager: TimerManager):
     active = await get_active_session(user_id)
@@ -24,7 +32,15 @@ async def btn_now(message: Message, user_id: int, timer_manager: TimerManager):
         elapsed = await calc_elapsed(active["id"])
         path_str = await get_path_string(active["node_id"])
         status_icon = "▶️" if active["status"] == "running" else "⏸"
-        text = f"{status_icon} {path_str}\n⏱ {format_duration(elapsed)}"
+
+        user = await get_user(user_id)
+        user_tz = user["timezone"] if user else "UTC"
+        today_finished = await get_today_time_for_node(user_id, active["node_id"], user_tz)
+        total_today = today_finished + elapsed
+
+        text = (f"{status_icon} {path_str}\n"
+                f"⏱ {format_duration(elapsed)}"
+                f"{_today_line(total_today)}")
         kb = running_kb(active["id"]) if active["status"] == "running" else paused_kb(active["id"])
         sent = await message.answer(text, reply_markup=kb)
         await update_session_message(active["id"], sent.message_id, sent.chat.id)
@@ -82,15 +98,20 @@ async def nav_tree(callback: CallbackQuery, callback_data: NavCB, user_id: int):
 
 
 @router.callback_query(SelCB.filter())
-async def select_action(callback: CallbackQuery, callback_data: SelCB):
+async def select_action(callback: CallbackQuery, callback_data: SelCB, user_id: int):
     node = await get_node(callback_data.node_id)
     if node is None:
         await callback.answer("Event not found.", show_alert=True)
         return
 
     path_str = await get_path_string(node["id"])
+
+    user = await get_user(user_id)
+    user_tz = user["timezone"] if user else "UTC"
+    today_time = await get_today_time_for_node(user_id, node["id"], user_tz)
+
     await callback.message.edit_text(
-        f"🎯 {path_str}\n\nStart tracking?",
+        f"🎯 {path_str}{_today_line(today_time)}\n\nStart tracking?",
         reply_markup=action_confirm_kb(node["id"], node["parent_id"]),
     )
     await callback.answer()
@@ -107,9 +128,12 @@ async def start_action(callback: CallbackQuery, callback_data: StartCB,
         return
 
     path_str = await get_path_string(node_id)
-    elapsed = 0
-    text = f"▶️ {path_str}\n⏱ {format_duration(elapsed)}"
 
+    user = await get_user(user_id)
+    user_tz = user["timezone"] if user else "UTC"
+    today_finished = await get_today_time_for_node(user_id, node_id, user_tz)
+
+    text = f"▶️ {path_str}\n⏱ {format_duration(0)}{_today_line(today_finished)}"
     await callback.message.edit_text(text)
 
     session_id = await start_session(

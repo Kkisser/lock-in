@@ -283,6 +283,20 @@ async def get_session_pauses(session_id: int) -> list[dict]:
 
 # ── Today queries ──
 
+async def get_today_duration_for_node(user_id: int, node_id: int,
+                                      start: str, end: str) -> int:
+    db = await get_db()
+    cur = await db.execute(
+        "SELECT COALESCE(SUM(duration_seconds), 0) AS total "
+        "FROM sessions "
+        "WHERE user_id = ? AND node_id = ? AND status = 'finished' "
+        "AND started_at >= ? AND started_at < ?",
+        (user_id, node_id, start, end),
+    )
+    row = await cur.fetchone()
+    return row["total"] if row else 0
+
+
 async def get_finished_sessions_in_range(user_id: int,
                                          start: str, end: str) -> list[dict]:
     db = await get_db()
