@@ -138,7 +138,12 @@ async def get_node(node_id: int) -> dict | None:
 async def get_children(user_id: int, parent_id: int) -> list[dict]:
     db = await get_db()
     cur = await db.execute(
-        "SELECT * FROM nodes WHERE user_id = ? AND parent_id = ? ORDER BY name",
+        "SELECT n.*, COUNT(c.id) AS child_count "
+        "FROM nodes n "
+        "LEFT JOIN nodes c ON c.parent_id = n.id "
+        "WHERE n.user_id = ? AND n.parent_id = ? "
+        "GROUP BY n.id "
+        "ORDER BY n.name",
         (user_id, parent_id),
     )
     rows = await cur.fetchall()

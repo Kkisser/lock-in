@@ -6,11 +6,11 @@ from services.event_service import (
     get_children, get_node, get_path_string, get_path_string_for_action,
 )
 from services.session_service import (
-    get_active_session, start_session, calc_elapsed, update_session_message,
+    get_active_session, start_session, calc_elapsed, update_session_message, get_session,
 )
 from services.today_service import get_today_time_for_action
 from services.user_service import get_user
-from utils.time_utils import format_duration
+from utils.time_utils import format_duration, format_local_time
 from utils.timer import TimerManager
 from keyboards.navigation import (
     build_tree_kb, build_tree_kb_with_back, action_confirm_kb,
@@ -40,7 +40,9 @@ async def btn_now(message: Message, user_id: int, timer_manager: TimerManager):
         today_finished = await get_today_time_for_action(user_id, active["action_id"], user_tz)
         total_today = today_finished + elapsed
 
+        start_time = format_local_time(active["started_at"], user_tz)
         text = (f"{status_icon} {path_str}\n"
+                f"🕐 Started: {start_time}\n"
                 f"⏱ {format_duration(elapsed)}"
                 f"{_today_line(total_today)}")
         kb = running_kb(active["id"]) if active["status"] == "running" else paused_kb(active["id"])
@@ -136,9 +138,6 @@ async def start_action(callback: CallbackQuery, callback_data: StartCB,
     user_tz = user["timezone"] if user else "UTC"
     today_finished = await get_today_time_for_action(user_id, action_id, user_tz)
 
-    text = f"▶️ {path_str}\n⏱ {format_duration(0)}{_today_line(today_finished)}"
-    await callback.message.edit_text(text)
-
     session_id = await start_session(
         user_id, action_id, callback.message.message_id, callback.message.chat.id
     )
@@ -154,6 +153,12 @@ async def start_action(callback: CallbackQuery, callback_data: StartCB,
         await callback.answer()
         return
 
-    await callback.message.edit_reply_markup(reply_markup=running_kb(session_id))
+    session = await get_session(session_id)
+    start_time = format_local_time(session["started_at"], user_tz)
+    text = (f"▶️ {path_str}\n"
+            f"🕐 Started: {start_time}\n"
+            f"⏱ {format_duration(0)}"
+            f"{_today_line(today_finished)}")
+    await callback.message.edit_text(text, reply_markup=running_kb(session_id))
     timer_manager.start_timer(user_id, session_id)
     await callback.answer("Session started!")

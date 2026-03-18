@@ -27,6 +27,12 @@ def format_duration(seconds: int) -> str:
     return f"{s}s"
 
 
+def format_local_time(iso_str: str, user_tz: str = "UTC") -> str:
+    """Return HH:MM in the user's local timezone."""
+    tz = ZoneInfo(user_tz)
+    return parse_iso(iso_str).astimezone(tz).strftime("%H:%M")
+
+
 def today_range_utc(user_tz: str = "UTC") -> tuple[str, str]:
     tz = ZoneInfo(user_tz)
     local_now = datetime.now(tz)

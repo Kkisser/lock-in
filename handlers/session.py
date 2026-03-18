@@ -8,7 +8,7 @@ from services.session_service import (
 )
 from services.event_service import get_path_string_for_action
 from services.user_service import get_user
-from utils.time_utils import format_duration
+from utils.time_utils import format_duration, format_local_time
 from utils.timer import TimerManager
 from keyboards.session_kb import running_kb, paused_kb, confirm_finish_kb
 
@@ -27,13 +27,16 @@ async def session_control(callback: CallbackQuery, callback_data: SesCB,
         return
 
     path_str = await get_path_string_for_action(session["user_id"], session["action_id"])
+    user = await get_user(user_id)
+    user_tz = user["timezone"] if user else "UTC"
+    start_time = format_local_time(session["started_at"], user_tz)
 
     if action == "pause":
         await pause_session(session_id)
         timer_manager.stop_timer(user_id)
         elapsed = await calc_elapsed(session_id)
         await callback.message.edit_text(
-            f"⏸ {path_str}\n⏱ {format_duration(elapsed)}",
+            f"⏸ {path_str}\n🕐 Started: {start_time}\n⏱ {format_duration(elapsed)}",
             reply_markup=paused_kb(session_id),
         )
         await callback.answer("Paused")
@@ -42,14 +45,13 @@ async def session_control(callback: CallbackQuery, callback_data: SesCB,
         await resume_session(session_id)
         elapsed = await calc_elapsed(session_id)
         await callback.message.edit_text(
-            f"▶️ {path_str}\n⏱ {format_duration(elapsed)}",
+            f"▶️ {path_str}\n🕐 Started: {start_time}\n⏱ {format_duration(elapsed)}",
             reply_markup=running_kb(session_id),
         )
         timer_manager.start_timer(user_id, session_id)
         await callback.answer("Resumed")
 
     elif action == "finish":
-        user = await get_user(user_id)
         if user and user["confirm_finish"]:
             elapsed = await calc_elapsed(session_id)
             await callback.message.edit_text(
@@ -69,12 +71,12 @@ async def session_control(callback: CallbackQuery, callback_data: SesCB,
         elapsed = await calc_elapsed(session_id)
         if session["status"] == "paused":
             await callback.message.edit_text(
-                f"⏸ {path_str}\n⏱ {format_duration(elapsed)}",
+                f"⏸ {path_str}\n🕐 Started: {start_time}\n⏱ {format_duration(elapsed)}",
                 reply_markup=paused_kb(session_id),
             )
         else:
             await callback.message.edit_text(
-                f"▶️ {path_str}\n⏱ {format_duration(elapsed)}",
+                f"▶️ {path_str}\n🕐 Started: {start_time}\n⏱ {format_duration(elapsed)}",
                 reply_markup=running_kb(session_id),
             )
             timer_manager.start_timer(user_id, session_id)

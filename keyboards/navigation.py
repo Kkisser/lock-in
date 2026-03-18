@@ -7,8 +7,10 @@ def build_tree_kb(children: list[dict], parent_id: int) -> InlineKeyboardMarkup:
     buttons = []
     for child in children:
         if child["node_type"] == "group":
+            count = child.get("child_count", 0)
+            count_str = f" ({count})" if count > 0 else ""
             buttons.append([InlineKeyboardButton(
-                text=f"📁 {child['name']}",
+                text=f"📁 {child['name']}{count_str}",
                 callback_data=NavCB(parent_id=child["id"]).pack(),
             )])
         else:
@@ -27,8 +29,10 @@ def build_tree_kb_with_back(children: list[dict], current_event_parent_id: int) 
     buttons = []
     for child in children:
         if child["node_type"] == "group":
+            count = child.get("child_count", 0)
+            count_str = f" ({count})" if count > 0 else ""
             buttons.append([InlineKeyboardButton(
-                text=f"📁 {child['name']}",
+                text=f"📁 {child['name']}{count_str}",
                 callback_data=NavCB(parent_id=child["id"]).pack(),
             )])
         else:

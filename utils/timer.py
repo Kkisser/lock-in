@@ -8,7 +8,7 @@ from services.session_service import calc_elapsed, get_session
 from services.event_service import get_path_string_for_action
 from services.today_service import get_today_time_for_action
 from services.user_service import get_user
-from utils.time_utils import format_duration
+from utils.time_utils import format_duration, format_local_time
 from keyboards.session_kb import running_kb, paused_kb
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,10 @@ class TimerManager:
                 total_today = today_finished + elapsed
                 today_line = f"\n📊 Today: {format_duration(total_today)}"
 
-                text = f"{status_icon} {path_str}\n⏱ {format_duration(elapsed)}{today_line}"
+                start_time = format_local_time(session["started_at"], user_tz)
+                text = (f"{status_icon} {path_str}\n"
+                        f"🕐 Started: {start_time}\n"
+                        f"⏱ {format_duration(elapsed)}{today_line}")
                 kb = running_kb(session_id) if session["status"] == "running" else paused_kb(session_id)
 
                 try:
