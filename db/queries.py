@@ -341,6 +341,147 @@ async def get_session_pauses(session_id: int) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+# ── Long-term ──
+
+async def create_longterm_item(user_id: int, action_id: int, tracking_type: str,
+                                counter_target: int | None, counter_unit: str | None,
+                                timer_target_seconds: int | None) -> int:
+    db = await get_db()
+    ts = now_iso()
+    cur = await db.execute(
+        "INSERT INTO action_longterm "
+        "(user_id, action_id, tracking_type, counter_target, counter_unit, "
+        "timer_target_seconds, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (user_id, action_id, tracking_type, counter_target, counter_unit,
+         timer_target_seconds, ts, ts),
+    )
+    await db.commit()
+    return cur.lastrowid
+
+
+async def get_longterm_item(lt_id: int) -> dict | None:
+    db = await get_db()
+    cur = await db.execute(
+        "SELECT lt.*, a.name AS action_name "
+        "FROM action_longterm lt JOIN actions a ON lt.action_id = a.id "
+        "WHERE lt.id = ?",
+        (lt_id,),
+    )
+    row = await cur.fetchone()
+    return dict(row) if row else None
+
+
+async def get_all_longterm_items(user_id: int) -> list[dict]:
+    db = await get_db()
+    cur = await db.execute(
+        "SELECT lt.*, a.name AS action_name "
+        "FROM action_longterm lt JOIN actions a ON lt.action_id = a.id "
+        "WHERE lt.user_id = ? AND lt.is_active = 1 ORDER BY a.name",
+        (user_id,),
+    )
+    rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+async def get_longterm_by_action(user_id: int, action_id: int) -> dict | None:
+    db = await get_db()
+    cur = await db.execute(
+        "SELECT * FROM action_longterm WHERE user_id = ? AND action_id = ?",
+        (user_id, action_id),
+    )
+    row = await cur.fetchone()
+    return dict(row) if row else None
+
+
+async def delete_longterm_item(lt_id: int):
+    db = await get_db()
+    await db.execute("DELETE FROM action_longterm WHERE id = ?", (lt_id,))
+    await db.commit()
+
+
+# ── Longterm runs ──
+
+async def create_run(longterm_id: int) -> int:
+    db = await get_db()
+    ts = now_iso()
+    cur = await db.execute(
+        "INSERT INTO action_longterm_runs (longterm_id, started_at, created_at) VALUES (?, ?, ?)",
+        (longterm_id, ts, ts),
+    )
+    await db.commit()
+    return cur.lastrowid
+
+
+async def get_active_run(longterm_id: int) -> dict | None:
+    db = await get_db()
+    cur = await db.execute(
+        "SELECT * FROM action_longterm_runs "
+        "WHERE longterm_id = ? AND ended_at IS NULL ORDER BY id DESC LIMIT 1",
+        (longterm_id,),
+    )
+    row = await cur.fetchone()
+    return dict(row) if row else None
+
+
+async def end_run(run_id: int, reason: str):
+    db = await get_db()
+    ts = now_iso()
+    await db.execute(
+        "UPDATE action_longterm_runs SET ended_at = ?, end_reason = ? WHERE id = ?",
+        (ts, reason, run_id),
+    )
+    await db.commit()
+
+
+async def get_all_runs(longterm_id: int) -> list[dict]:
+    db = await get_db()
+    cur = await db.execute(
+        "SELECT * FROM action_longterm_runs WHERE longterm_id = ? ORDER BY id DESC",
+        (longterm_id,),
+    )
+    rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
+# ── Longterm counter entries ──
+
+async def add_counter_entry(longterm_id: int, user_id: int,
+                             amount: int, recorded_at: str) -> int:
+    db = await get_db()
+    ts = now_iso()
+    cur = await db.execute(
+        "INSERT INTO action_longterm_counter_entries "
+        "(longterm_id, user_id, amount, recorded_at, created_at) VALUES (?, ?, ?, ?, ?)",
+        (longterm_id, user_id, amount, recorded_at, ts),
+    )
+    await db.commit()
+    return cur.lastrowid
+
+
+async def get_today_counter_total(longterm_id: int, start: str, end: str) -> int:
+    db = await get_db()
+    cur = await db.execute(
+        "SELECT COALESCE(SUM(amount), 0) AS total "
+        "FROM action_longterm_counter_entries "
+        "WHERE longterm_id = ? AND recorded_at >= ? AND recorded_at < ?",
+        (longterm_id, start, end),
+    )
+    row = await cur.fetchone()
+    return row["total"] if row else 0
+
+
+async def get_counter_entries_in_range(longterm_id: int,
+                                        start: str, end: str) -> list[dict]:
+    db = await get_db()
+    cur = await db.execute(
+        "SELECT * FROM action_longterm_counter_entries "
+        "WHERE longterm_id = ? AND recorded_at >= ? AND recorded_at < ? ORDER BY recorded_at",
+        (longterm_id, start, end),
+    )
+    rows = await cur.fetchall()
+    return [dict(r) for r in rows]
+
+
 # ── Today queries ──
 
 async def get_today_duration_for_action(user_id: int, action_id: int,

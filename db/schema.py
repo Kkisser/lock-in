@@ -65,6 +65,38 @@ CREATE TABLE IF NOT EXISTS action_session_pauses (
     ended_at   TEXT,
     created_at TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS action_longterm (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id              INTEGER NOT NULL REFERENCES users(id),
+    action_id            INTEGER NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+    tracking_type        TEXT NOT NULL CHECK(tracking_type IN ('counter', 'timer', 'both')),
+    counter_target       INTEGER,
+    counter_unit         TEXT,
+    timer_target_seconds INTEGER,
+    is_active            INTEGER NOT NULL DEFAULT 1,
+    created_at           TEXT NOT NULL,
+    updated_at           TEXT NOT NULL,
+    UNIQUE(user_id, action_id)
+);
+
+CREATE TABLE IF NOT EXISTS action_longterm_runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    longterm_id INTEGER NOT NULL REFERENCES action_longterm(id) ON DELETE CASCADE,
+    started_at  TEXT NOT NULL,
+    ended_at    TEXT,
+    end_reason  TEXT CHECK(end_reason IN ('manual', 'broken')),
+    created_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS action_longterm_counter_entries (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    longterm_id INTEGER NOT NULL REFERENCES action_longterm(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    amount      INTEGER NOT NULL DEFAULT 1,
+    recorded_at TEXT NOT NULL,
+    created_at  TEXT NOT NULL
+);
 """
 
 

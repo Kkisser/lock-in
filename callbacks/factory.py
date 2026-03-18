@@ -70,3 +70,59 @@ class EMvSelCB(CallbackData, prefix="emvsel"):
     """Editor move: confirm move to selected parent."""
     target_parent_id: int
     node_id: int
+
+
+# ── Long-term callbacks ──
+
+class LtItemCB(CallbackData, prefix="ltitem"):
+    """Open a long-term item detail."""
+    lt_id: int
+
+
+class LtCounterAddCB(CallbackData, prefix="ltcnt"):
+    """Add counter entry. amount=0 means ask for custom amount."""
+    lt_id: int
+    amount: int
+
+
+class LtStartTimerCB(CallbackData, prefix="lttimer"):
+    """Start a Now session from long-term."""
+    lt_id: int
+
+
+class LtHistoryCB(CallbackData, prefix="lthist"):
+    """View long-term history."""
+    lt_id: int
+
+
+class LtEndRunCB(CallbackData, prefix="ltrun"):
+    """End/reset the current run. confirm=0 asks, confirm=1 executes."""
+    lt_id: int
+    confirm: int
+
+
+class LtDeleteCB(CallbackData, prefix="ltdel"):
+    """Delete a long-term item. confirm=0 asks, confirm=1 executes."""
+    lt_id: int
+    confirm: int
+
+
+class LtNavCB(CallbackData, prefix="ltnav"):
+    """Navigate action tree during long-term add flow."""
+    parent_id: int
+
+
+class LtSelCB(CallbackData, prefix="ltsel"):
+    """Select an action_ref node during long-term add flow."""
+    node_id: int
+
+
+class LtTypeCB(CallbackData, prefix="lttype"):
+    """Choose tracking type: counter / timer / both."""
+    node_id: int
+    tracking_type: str
+
+
+class LtSkipCB(CallbackData, prefix="ltskip"):
+    """Skip optional counter unit input."""
+    pass
