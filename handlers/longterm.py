@@ -7,7 +7,7 @@ from aiogram.fsm.context import FSMContext
 
 from callbacks.factory import (
     LtItemCB, LtCounterAddCB, LtStartTimerCB, LtHistoryCB,
-    LtEndRunCB, LtDeleteCB, LtNavCB, LtSelCB, LtTypeCB, LtSkipCB,
+    LtEndRunCB, LtDeleteCB, LtNavCB, LtSelCB, LtTypeCB, LtSkipCB, LtNoTargetCB,
 )
 from db import queries
 from services import longterm_service
@@ -18,7 +18,7 @@ from services.user_service import get_user
 from states.longterm_states import LongtermFSM
 from keyboards.longterm_kb import (
     longterm_list_kb, longterm_item_kb, confirm_end_run_kb,
-    confirm_delete_lt_kb, history_kb, lt_tree_kb, type_choice_kb, skip_kb,
+    confirm_delete_lt_kb, history_kb, lt_tree_kb, type_choice_kb, skip_kb, no_target_kb,
 )
 from utils.time_utils import format_duration, format_local_time, today_range_utc, parse_iso
 from utils.timer import TimerManager
@@ -55,18 +55,24 @@ async def _build_item(lt_id: int, user_id: int, user_tz: str) -> tuple[str, obje
 
     if lt["tracking_type"] in ("counter", "both"):
         done = progress.get("counter_done", 0)
-        target = lt["counter_target"] or 0
+        target = lt["counter_target"]
         unit = lt["counter_unit"] or "times"
-        icon = "✅" if done >= target else "⏳"
-        text += f"  {icon} {done}/{target} {unit}\n"
+        if target:
+            icon = "✅" if done >= target else "⏳"
+            text += f"  {icon} {done}/{target} {unit}\n"
+        else:
+            text += f"  🔢 {done} {unit}\n"
 
     if lt["tracking_type"] in ("timer", "both"):
         done_s = progress.get("timer_done", 0)
-        target_s = lt["timer_target_seconds"] or 0
+        target_s = lt["timer_target_seconds"]
         done_min = done_s // 60
-        target_min = target_s // 60
-        icon = "✅" if done_s >= target_s else "⏳"
-        text += f"  {icon} {done_min}/{target_min} min\n"
+        if target_s:
+            target_min = target_s // 60
+            icon = "✅" if done_s >= target_s else "⏳"
+            text += f"  {icon} {done_min}/{target_min} min\n"
+        else:
+            text += f"  ⏱ {done_min} min\n"
 
     kb = longterm_item_kb(lt, has_active_run=run is not None)
     return text, kb
@@ -160,10 +166,16 @@ async def lt_type_chosen(callback: CallbackQuery, callback_data: LtTypeCB,
 
     if tracking_type in ("counter", "both"):
         await state.set_state(LongtermFSM.waiting_counter_target)
-        await callback.message.edit_text("Enter daily target count (e.g. 3, 20):")
+        await callback.message.edit_text(
+            "Enter daily target count (e.g. 3, 20):",
+            reply_markup=no_target_kb("counter"),
+        )
     else:
         await state.set_state(LongtermFSM.waiting_timer_target)
-        await callback.message.edit_text("Enter daily target in minutes (e.g. 20, 30):")
+        await callback.message.edit_text(
+            "Enter daily target in minutes (e.g. 20, 30):",
+            reply_markup=no_target_kb("timer"),
+        )
     await callback.answer()
 
 
@@ -186,8 +198,32 @@ async def lt_skip(callback: CallbackQuery, user_id: int, state: FSMContext):
     data = await state.get_data()
     if data.get("lt_tracking_type") == "both":
         await state.set_state(LongtermFSM.waiting_timer_target)
-        await callback.message.edit_text("Enter daily timer target in minutes (e.g. 20):")
+        await callback.message.edit_text(
+            "Enter daily timer target in minutes (e.g. 20):",
+            reply_markup=no_target_kb("timer"),
+        )
     else:
+        await _finish_setup(callback.message, state, user_id)
+    await callback.answer()
+
+
+@router.callback_query(LtNoTargetCB.filter())
+async def lt_no_target(callback: CallbackQuery, callback_data: LtNoTargetCB,
+                       user_id: int, state: FSMContext):
+    data = await state.get_data()
+    if "lt_node_id" not in data:
+        await callback.answer("Setup expired. Please start over.")
+        return
+
+    if callback_data.step == "counter":
+        await state.update_data(lt_counter_target=None)
+        await state.set_state(LongtermFSM.waiting_counter_unit)
+        await callback.message.edit_text(
+            "Enter the unit (e.g. times, cups, pills) — or press Skip:",
+            reply_markup=skip_kb(),
+        )
+    elif callback_data.step == "timer":
+        await state.update_data(lt_timer_target_seconds=None)
         await _finish_setup(callback.message, state, user_id)
     await callback.answer()
 
@@ -202,7 +238,10 @@ async def lt_counter_unit(message: Message, user_id: int, state: FSMContext):
     data = await state.get_data()
     if data.get("lt_tracking_type") == "both":
         await state.set_state(LongtermFSM.waiting_timer_target)
-        await message.answer("Enter daily timer target in minutes (e.g. 20):")
+        await message.answer(
+            "Enter daily timer target in minutes (e.g. 20):",
+            reply_markup=no_target_kb("timer"),
+        )
     else:
         await _finish_setup(message, state, user_id)
 
@@ -370,18 +409,24 @@ async def lt_history(callback: CallbackQuery, callback_data: LtHistoryCB, user_i
         parts = []
         if lt["tracking_type"] in ("counter", "both"):
             cnt = await queries.get_today_counter_total(lt["id"], day_start_utc, day_end_utc)
-            target = lt["counter_target"] or 0
-            icon = "✅" if cnt >= target else ("—" if cnt == 0 else "⏳")
-            parts.append(f"{icon} {cnt}/{target}")
+            target = lt["counter_target"]
+            if target:
+                icon = "✅" if cnt >= target else ("—" if cnt == 0 else "⏳")
+                parts.append(f"{icon} {cnt}/{target}")
+            else:
+                parts.append(f"🔢 {cnt}" if cnt > 0 else "—")
         if lt["tracking_type"] in ("timer", "both"):
             timer_s = await queries.get_today_duration_for_action(
                 user_id, lt["action_id"], day_start_utc, day_end_utc
             )
-            target_s = lt["timer_target_seconds"] or 0
             done_min = timer_s // 60
-            target_min = target_s // 60
-            icon = "✅" if timer_s >= target_s else ("—" if timer_s == 0 else "⏳")
-            parts.append(f"{icon} {done_min}/{target_min}min")
+            target_s = lt["timer_target_seconds"]
+            if target_s:
+                target_min = target_s // 60
+                icon = "✅" if timer_s >= target_s else ("—" if timer_s == 0 else "⏳")
+                parts.append(f"{icon} {done_min}/{target_min}min")
+            else:
+                parts.append(f"⏱ {done_min}min" if timer_s > 0 else "—")
 
         lines.append(f"  {day_label}: {' | '.join(parts) if parts else '—'}")
 

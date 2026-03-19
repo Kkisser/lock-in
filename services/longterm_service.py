@@ -39,17 +39,23 @@ def format_progress(lt: dict, progress: dict) -> str:
     parts = []
     if lt["tracking_type"] in ("counter", "both"):
         done = progress.get("counter_done", 0)
-        target = lt["counter_target"] or 0
+        target = lt["counter_target"]
         unit = lt["counter_unit"] or "times"
-        icon = "✅" if done >= target else "⏳"
-        parts.append(f"{icon} {done}/{target} {unit}")
+        if target:
+            icon = "✅" if done >= target else "⏳"
+            parts.append(f"{icon} {done}/{target} {unit}")
+        else:
+            parts.append(f"🔢 {done} {unit}")
     if lt["tracking_type"] in ("timer", "both"):
         done_s = progress.get("timer_done", 0)
-        target_s = lt["timer_target_seconds"] or 0
+        target_s = lt["timer_target_seconds"]
         done_min = done_s // 60
-        target_min = target_s // 60
-        icon = "✅" if done_s >= target_s else "⏳"
-        parts.append(f"{icon} {done_min}/{target_min} min")
+        if target_s:
+            target_min = target_s // 60
+            icon = "✅" if done_s >= target_s else "⏳"
+            parts.append(f"{icon} {done_min}/{target_min} min")
+        else:
+            parts.append(f"⏱ {done_min} min")
     return " | ".join(parts)
 
 

@@ -1,7 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from callbacks.factory import (
     LtItemCB, LtCounterAddCB, LtStartTimerCB, LtHistoryCB,
-    LtEndRunCB, LtDeleteCB, LtNavCB, LtSelCB, LtTypeCB, LtSkipCB,
+    LtEndRunCB, LtDeleteCB, LtNavCB, LtSelCB, LtTypeCB, LtSkipCB, LtNoTargetCB,
 )
 
 
@@ -149,4 +149,13 @@ def type_choice_kb(node_id: int) -> InlineKeyboardMarkup:
 def skip_kb() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
         InlineKeyboardButton(text="Skip", callback_data=LtSkipCB().pack()),
+    ]])
+
+
+def no_target_kb(step: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text="⏭ No target",
+            callback_data=LtNoTargetCB(step=step).pack(),
+        ),
     ]])

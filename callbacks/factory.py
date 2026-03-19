@@ -126,3 +126,8 @@ class LtTypeCB(CallbackData, prefix="lttype"):
 class LtSkipCB(CallbackData, prefix="ltskip"):
     """Skip optional counter unit input."""
     pass
+
+
+class LtNoTargetCB(CallbackData, prefix="ltnotarget"):
+    """Skip target input (no daily target for this item)."""
+    step: str  # 'counter' or 'timer'
