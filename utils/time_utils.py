@@ -27,6 +27,23 @@ def format_duration(seconds: int) -> str:
     return f"{s}s"
 
 
+def format_run_duration(started_at: str) -> str:
+    """Elapsed time since run started: '🔥 X д Y ч Z мин'"""
+    started = parse_iso(started_at)
+    now = datetime.now(timezone.utc)
+    total_seconds = max(0, int((now - started).total_seconds()))
+    d, remainder = divmod(total_seconds, 86400)
+    h, remainder = divmod(remainder, 3600)
+    m = remainder // 60
+    if d > 0:
+        return f"🔥 {d} д {h} ч {m} мин"
+    if h > 0:
+        return f"🔥 {h} ч {m} мин"
+    if m > 0:
+        return f"🔥 {m} мин"
+    return "🔥 < 1 мин"
+
+
 def format_local_time(iso_str: str, user_tz: str = "UTC") -> str:
     """Return HH:MM in the user's local timezone."""
     tz = ZoneInfo(user_tz)

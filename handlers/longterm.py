@@ -20,7 +20,7 @@ from keyboards.longterm_kb import (
     longterm_list_kb, longterm_item_kb, confirm_end_run_kb,
     confirm_delete_lt_kb, history_kb, lt_tree_kb, type_choice_kb, skip_kb, no_target_kb,
 )
-from utils.time_utils import format_duration, format_local_time, today_range_utc, parse_iso
+from utils.time_utils import format_duration, format_local_time, today_range_utc, parse_iso, format_run_duration
 from utils.timer import TimerManager
 from keyboards.session_kb import running_kb
 
@@ -44,24 +44,24 @@ async def _build_item(lt_id: int, user_id: int, user_tz: str) -> tuple[str, obje
     if lt is None:
         return None
     progress = await longterm_service.get_today_progress(lt, user_tz)
-    run_day = await longterm_service.get_run_day(lt_id)
     run = await queries.get_active_run(lt_id)
 
-    type_labels = {"counter": "🔢 Counter", "timer": "⏱ Timer", "both": "🔢+⏱ Both"}
-    text = f"🌱 {lt['action_name']}\n"
-    text += f"Type: {type_labels.get(lt['tracking_type'], lt['tracking_type'])}\n"
-    text += f"🔥 Day {run_day}\n" if run else "No active run\n"
-    text += "\nToday:\n"
+    SEP = "──────────────────────"
+    lines = [f"🌱 {lt['action_name']}", SEP]
+
+    run_val = format_run_duration(run["started_at"]) if run else "—"
+    lines.append(f"{'Run':<7}: {run_val}")
+    lines.extend([SEP, "Сегодня"])
 
     if lt["tracking_type"] in ("counter", "both"):
         done = progress.get("counter_done", 0)
         target = lt["counter_target"]
-        unit = lt["counter_unit"] or "times"
+        unit = lt["counter_unit"] or "раз"
         if target:
             icon = "✅" if done >= target else "⏳"
-            text += f"  {icon} {done}/{target} {unit}\n"
+            lines.append(f"{'Кол-во':<7}: {done} / {target} {unit}  {icon}")
         else:
-            text += f"  🔢 {done} {unit}\n"
+            lines.append(f"{'Кол-во':<7}: {done} {unit}")
 
     if lt["tracking_type"] in ("timer", "both"):
         done_s = progress.get("timer_done", 0)
@@ -70,12 +70,13 @@ async def _build_item(lt_id: int, user_id: int, user_tz: str) -> tuple[str, obje
         if target_s:
             target_min = target_s // 60
             icon = "✅" if done_s >= target_s else "⏳"
-            text += f"  {icon} {done_min}/{target_min} min\n"
+            lines.append(f"{'Время':<7}: {done_min} / {target_min} мин  {icon}")
         else:
-            text += f"  ⏱ {done_min} min\n"
+            lines.append(f"{'Время':<7}: {done_min} мин")
 
+    lines.append(SEP)
     kb = longterm_item_kb(lt, has_active_run=run is not None)
-    return text, kb
+    return "\n".join(lines), kb
 
 
 # ── Main screens ──
